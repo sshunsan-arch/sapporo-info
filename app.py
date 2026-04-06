@@ -32,25 +32,33 @@ try:
 except:
     st.error("情報を取得できませんでした。")
 
-# --- 3. JR北海道コーナー（APIステータス判定の完璧版！） ---
+# --- 3. JR北海道コーナー（本番環境でのブロック対策版） ---
 st.header("🚆 JR北海道 (札幌近郊)")
-url_jr = "https://www3.jrhokkaido.co.jp/webunkou/json/area/area_01.json"
+# 再び、通常の運行情報ページを表示用URLとして使います
+url_jr = "https://www3.jrhokkaido.co.jp/webunkou/area_spo.html"
 
 try:
-    response_jr = requests.get(url_jr)
-    data_jr = response_jr.json()
+    # ユーザー（人間）がブラウザでアクセスしているように見せかけるおまじない
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response_jr = requests.get(url_jr, headers=headers, timeout=10)
+    response_jr.encoding = 'utf-8' # 文字化け防止
     
-    # ★大発見！JSONデータから今日の「札幌近郊(spo)」のステータス数字を直接抜き出します
-    spo_status = data_jr['today']['areaStatus']['spo']
+    soup_jr = BeautifulSoup(response_jr.text, 'html.parser')
+    text_jr = soup_jr.get_text()
 
-    # 2＝平常、それ以外（1など）＝異常あり
-    if spo_status == 2:
-        st.success("✅ 現在、平常どおり運行しています")
+    # 「その他のエリア」を切り捨てて札幌近郊だけに絞る
+    if "その他のエリアの運行情報" in text_jr:
+        text_jr = text_jr.split("その他のエリアの運行情報")[0]
+
+    # ★最終的な判定ロジック
+    # 「情報はありません」という言葉があれば平常、なければ異常
+    if "情報はありません" in text_jr:
+        st.success("✅ 現在、目立った遅延情報は出ていないようです（平常運行）")
     else:
         st.warning("⚠️ 札幌近郊のJRに遅延や運休が発生している可能性があります！")
 
 except Exception as e:
-    st.error("情報を取得できませんでした。")
+    st.error(f"情報を取得できませんでした。時間をおいて再度お試しください。")
 
 # --- 4. 札幌市電コーナー（新規追加！） ---
 st.header("🚋 札幌市電")
